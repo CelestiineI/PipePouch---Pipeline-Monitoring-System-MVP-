@@ -1,5 +1,5 @@
 # PipePouch---Pipeline-Monitoring-System-MVP-
-PipePouch is a **Node.js–based pipeline monitoring application** to help safeguard crtitical oil and gas infrastructure. It simulates, detects, and visualizes pipeline operating conditions such as pressure, flow rate, wall thickness, and rupture thresholds to support early identification of abnormal behaviour that could threaten pipeline integrity.
+PipePouch is a **Node.js–based pipeline monitoring application** to help safeguard critical oil and gas infrastructure. It simulates, detects, and visualizes pipeline operating conditions such as pressure, flow rate, wall thickness, and rupture thresholds to support early identification of abnormal behaviour that could threaten pipeline integrity.
 
 This project is currently an **MVP (Minimum Viable Product)** Focuses on clarity, transparency, and extensibility rather than full industrial integration, providing a practical foundation that will be later  expanded to support real sensor data, historical analysis, and commercial-scale deployment**.
 
