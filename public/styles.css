@@ -1,0 +1,111 @@
+/* Global Styles */
+body {
+    font-family: 'Roboto', 'Arial', sans-serif;
+    background-color: cornflowerblue;
+    margin: 0;
+    padding: 0;
+  }
+
+
+  .title{
+    background-color: cornflowerblue;
+    text-align: center;
+    justify-content: center;
+    padding-top: 0;
+  }
+  
+  /* Header Styles */
+  header {
+    background-color: #333;
+    color: #ffffff;
+    padding: 15px 0;
+    text-align: center;
+  }
+  
+  header nav {
+    width: 100%;
+  }
+  header nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+  
+  header nav ul li {
+    margin:0 20px;
+    display: flex;
+    align-items: center;
+  }
+  
+  header nav ul li a,
+  header nav ul li a span
+  {
+    color: #e7e6f8;
+    text-decoration: none;
+    font-size: 20px;
+    font-weight: 700;
+
+  }
+
+  header nav ul li a:hover{
+    color: #e80c0c;
+  }
+  
+  header .quote_btn-container {
+    
+    display: flex;
+    align-items: center;
+    gap: 30px;
+    margin-left: auto;
+    position: absolute;
+    right: 0;
+    padding-right: 30px;
+
+  }
+  /* Main Content Styles */
+  .container {
+    margin: 10px auto;
+    padding: 30px;
+    max-width: 1000px;
+    color: #ca1f1f;
+    box-sizing: content-box;
+    box-shadow: 4px 4px black, 0 0 .4em rgb(245, 245, 239);
+    border-radius: 8px;
+    background-color: rgb(82, 136, 223);
+    
+  }
+
+  /* Small screens (e.g., mobile) */
+@media (max-width: 767px) {
+  .container {
+    height: 500px;
+  }
+}
+
+/* Medium screens (e.g., tablets) */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .container {
+    height: 600px;
+  }
+}
+
+/* Large screens (e.g., desktops) */
+@media (min-width: 1200px) {
+  .container {
+    height: 700px;
+  }
+}
+
+ /* Footer Styles */
+ footer{
+  color: rgb(224, 218, 218);
+  margin-left: auto;
+  position: absolute;
+  right: 0;
+  padding-right: 30px;
+  font-size: 15px;
+ }

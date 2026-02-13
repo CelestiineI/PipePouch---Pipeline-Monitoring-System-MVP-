@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<body>
+    <%- include('partials/header') %>
+        <div class="container">
+            <h1>Pipeline Monitoring</h1>
+            <p class="status-message"><%= statusMessage %></p>
+            <h2>Pipeline Parameters:</h2>
+            <ul>
+                <% for (const [key, value] of Object.entries(pipelineParameters)) {%>
+                    <li><%= key %>: <%= value %></li>
+                <% } %>
+            </ul>
+        </div>
+    <%- include('partials/footer') %>
+</body>
+</html>
