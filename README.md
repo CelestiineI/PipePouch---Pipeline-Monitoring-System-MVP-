@@ -37,7 +37,10 @@ PipePouch/
 ├── app.js                     # Main Express server entry point and routing logic
 ├── package.json               # Project metadata, dependencies, and npm scripts
 ├── README.md                  # Project documentation and usage guide
-│
+|
+├── config/
+|   ├──pipelienConfig.js        # Constants and simulation params
+|
 ├── views/
 │   ├── layout.ejs              # Base HTML layout (used by express-ejs-layouts)
 │   ├── index.ejs               # Dashboard overview and system summary page
