@@ -1,90 +1,163 @@
-const express =  require('express');
+const express = require('express');
 const path = require('path');
 
-//express app
+const { pipeline, thresholds, simulation } = require('./config/pipelineConfig');
+
 const app = express();
 
-// //Middleware to serve static files, i.e. public folder on current project directory
- app.use(express.static(path.join(__dirname, 'public')));
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
 
-//Set the view engine to EJS
+// View engine setup
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-//Pipeline parameters and thresholds
-const pipelineParameters ={
-    internalPressure: 85,       //in bar
-    externalPressure: 1,        //in bar (atmospheric)
-    pipelineTemperature: 40,    //in degC
-    ambientTemperature: 27,     //in degC
-    materialStrength: 100,      //in Mpa
-    wallThickness: 10,          //in mm
-    diameter: 600,              // in mm
-    fluidType: 'liquid', 
-    flowRate: 150,              //in m3 per hour
-    vicousity: 0.004,           //in pa.s
-    density: 850,               //in <kg/m3
-    windSpeed: 5,               //in m/s
-    leaksize:0,                 //in mm2
-};
+// ────────────────────────────────────────────────
+// Fake measurement generator – now supports previous state for continuity
+// ────────────────────────────────────────────────
+function generateMeasurement(prev = null) {
+  const now = new Date();
 
-const ruptureThresholds ={
-    pressureDropRate: 5,         //in bar per second
-    maxAllowablePressure: 90,    //in bar
-    minWallThickness: 8,         //mm
-    criticalFlowRateChange: 20   //cubic meters per hour
-};
+  // Base variation (sinusoidal)
+  const timeFactor = now.getTime() / 1000000;
+  const pressureVar = Math.sin(timeFactor) * simulation.basePressureVariation_percent / 100;
+  const flowVar     = Math.sin(timeFactor * 1.3) * 0.015;
 
-function calculatePressureDropRate(internalPressure, externalPressure) {
-    return (internalPressure - externalPressure) / 10;
+  // Start from nominal or evolve from previous
+  let pressure = prev ? prev.internalPressure_bar : pipeline.internalPressure_bar;
+  let flow     = prev ? prev.flowRate_m3h         : pipeline.nominalFlowRate_m3h;
+
+  // Apply base variation + noise
+  pressure *= (1 + pressureVar);
+  flow     *= (1 + flowVar);
+
+  pressure += (Math.random() - 0.5) * simulation.flowNoise_percent / 100 * pipeline.internalPressure_bar;
+  flow     += (Math.random() - 0.5) * simulation.flowNoise_percent / 100 * pipeline.nominalFlowRate_m3h;
+
+  // Rare event simulation
+  if (Math.random() < simulation.rareEventChance) {
+    const eventType = Math.random();
+    if (eventType < 0.4) {
+      // Possible leak signature
+      pressure *= 0.82;
+      flow     *= 0.75;
+    } else if (eventType < 0.7) {
+      // Transient / pump issue
+      flow     *= 1.28;
+      pressure *= 1.09;
+    } else {
+      // Minor change
+      flow += (Math.random() - 0.5) * 35;
+    }
   }
-  
-  function calculateCriticalPressure(materialStrength, wallThickness, diameter) {
-    return (2 * materialStrength * wallThickness) / diameter;
-  }
 
-function isRuptureDetected(params, thresholds){
-    let{internalPressure, externalPressure, materialStrength, wallThickness, diameter, flowRate} =params
+  // Clamp to realistic range
+  pressure = Math.max(10, Math.min(110, pressure));
+  flow     = Math.max(20, Math.min(300, flow));
 
-    const pressureDropRate = calculatePressureDropRate(internalPressure, externalPressure);
-    const criticalPressure = calculateCriticalPressure(materialStrength, wallThickness, diameter);
-
-    if(internalPressure > criticalPressure){
-        return 'Pressure exceeds crititical limit!';
-    }
-
-    if(pressureDropRate> thresholds.pressureDropRate){
-        return 'Sudden pressure drop detected! Possible rupture.';
-    }
-
-    const flowRateChange = Math.abs(flowRate -params.flowRate);
-    
-    if(flowRateChange > thresholds.criticalFlowRateChange){
-        return  'Signicant change in flow rate! Possible rupture.';
-    }
-
-    return 'Pipeline operating within safe parameters.';
+  return {
+    timestamp: now.toISOString(),
+    internalPressure_bar: Number(pressure.toFixed(2)),
+    flowRate_m3h: Number(flow.toFixed(1)),
+  };
 }
 
-//Route to display the monitoring results
+// Generate chain of measurements (smooth transitions)
+function generateMeasurementChain(count = 40) {
+  const measurements = [];
+  let prev = null;
+
+  for (let i = 0; i < count; i++) {
+    const m = generateMeasurement(prev);
+    measurements.push(m);
+    prev = m;
+  }
+
+  return measurements;
+}
+
+// ────────────────────────────────────────────────
+// Anomaly detection – returns array of alerts (multi-alert support)
+// ────────────────────────────────────────────────
+function detectAnomaly(current, prevFlow) {
+  const alerts = [];
+  const { internalPressure_bar, flowRate_m3h } = current;
+
+  // Barlow burst pressure (MPa → bar conversion fixed)
+  const burstPressure_MPa =
+    (2 * pipeline.materialYieldStrength_MPa * pipeline.nominalWallThickness_mm) /
+    pipeline.nominalDiameter_mm;
+  const burstPressure_bar = burstPressure_MPa * 10;
+
+  // Optional safety factor example (uncomment if desired)
+  // const allowable_bar = burstPressure_bar / 1.5;
+
+  if (internalPressure_bar > burstPressure_bar * 1.05) {
+    alerts.push('CRITICAL: Pressure exceeds theoretical burst limit! (Barlow)');
+  }
+
+  if (internalPressure_bar > thresholds.maxAllowablePressure_bar) {
+    alerts.push('WARNING: Pressure above maximum allowable limit');
+  }
+
+  // Flow change
+  const flowChange = Math.abs(flowRate_m3h - prevFlow);
+  if (flowChange > thresholds.criticalFlowChange_m3h) {
+    const direction = flowRate_m3h > prevFlow ? 'increase' : 'drop';
+    alerts.push(
+      `ALERT: Significant flow ${direction} (${flowChange.toFixed(1)} m³/h)! Possible rupture or valve issue.`
+    );
+  }
+
+  if (alerts.length === 0) {
+    alerts.push('OK – Pipeline within normal operating range');
+  }
+
+  return alerts;
+}
+
+// ────────────────────────────────────────────────
+// Routes
+// ────────────────────────────────────────────────
+
 app.get('/', (req, res) => {
-    const statusMessage = isRuptureDetected(pipelineParameters, ruptureThresholds);
-    res.render('index', {statusMessage, pipelineParameters});
-    });
+  const history = generateMeasurementChain(20);
+  const latest = history[history.length - 1];
+  const prevFlow = history.length >= 2 ? history[history.length - 2].flowRate_m3h : pipeline.nominalFlowRate_m3h;
 
+  const alerts = detectAnomaly(latest, prevFlow);
 
-    app.get('/monitor', (req, res) =>{
-        res.render('monitor', {pipelineParameters, ruptureThresholds});
-    });
-    
-    //404 page
-    app.use((req, res) =>{
-        res.status(404).render('404');
-    });
+  res.render('index', {
+    alerts,                     // now array
+    latestMeasurement: latest,
+    history,
+    pipelineConfig: pipeline,
+  });
+});
 
-//Start the server
+app.get('/monitor', (req, res) => {
+  const history = generateMeasurementChain(40);
+  const latest = history[history.length - 1];
+  const prevFlow = history.length >= 2 ? history[history.length - 2].flowRate_m3h : pipeline.nominalFlowRate_m3h;
+
+  const alerts = detectAnomaly(latest, prevFlow);
+
+  res.render('monitor', {
+    latest,
+    alerts,
+    history,
+    pipeline: pipeline,
+    thresholds: thresholds,
+  });
+});
+
+// 404
+app.use((req, res) => {
+  res.status(404).render('404');
+});
+
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, ()=>{
-    console.log(`Server is running on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
 });
 
